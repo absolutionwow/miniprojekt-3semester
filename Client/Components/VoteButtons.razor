@@ -1,0 +1,11 @@
+<div class="votes">
+    <button type="button" class="vote-btn" title="Upvote" aria-label="Upvote" @onclick="OnUpvote">▲</button>
+    <span class="score">@Votes</span>
+    <button type="button" class="vote-btn" title="Downvote" aria-label="Downvote" @onclick="OnDownvote">▼</button>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public int Votes { get; set; }
+    [Parameter] public EventCallback OnUpvote { get; set; }
+    [Parameter] public EventCallback OnDownvote { get; set; }
+}

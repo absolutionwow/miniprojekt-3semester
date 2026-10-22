@@ -1,0 +1,59 @@
+@page "/"
+@inject ApiClient Api
+
+<PageTitle>Miniprojekt</PageTitle>
+
+<div class="page-header">
+    <h1>Latest threads</h1>
+    <a class="btn btn-primary" href="new">+ New thread</a>
+</div>
+
+@if (error is not null)
+{
+    <p class="error">@error</p>
+}
+else if (posts is null)
+{
+    <p>Loading…</p>
+}
+else if (posts.Count == 0)
+{
+    <p>No threads yet. Be the first to create one!</p>
+}
+else
+{
+    <ul class="thread-list">
+        @foreach (var p in posts)
+        {
+            <li class="thread-card">
+                <div class="score-badge">@p.Votes</div>
+                <div>
+                    <a class="thread-title" href="thread/@p.Id">@p.Title</a>
+                    <div class="meta">
+                        @(p.Url is null ? "text" : "link")
+                        · by @p.AuthorName
+                        · @p.CreatedAt.ToLocalTime().ToString("g")
+                        · 💬 @p.CommentCount
+                    </div>
+                </div>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<PostSummaryDto>? posts;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            posts = await Api.GetPostsAsync();
+        }
+        catch (HttpRequestException)
+        {
+            error = "Could not load threads. Is the server running?";
+        }
+    }
+}

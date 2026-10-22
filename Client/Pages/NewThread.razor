@@ -1,0 +1,84 @@
+@page "/new"
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>New thread</PageTitle>
+
+<p><a href="">← Back to the front page</a></p>
+<h1>New thread</h1>
+
+<EditForm Model="request" OnValidSubmit="Submit" class="form">
+    <DataAnnotationsValidator />
+
+    <div class="field">
+        <label for="author">Your name</label>
+        <InputText id="author" @bind-Value="request.AuthorName" />
+        <ValidationMessage For="() => request.AuthorName" />
+    </div>
+
+    <div class="field">
+        <label for="title">Title</label>
+        <InputText id="title" @bind-Value="request.Title" />
+        <ValidationMessage For="() => request.Title" />
+    </div>
+
+    <div class="tabs">
+        <button type="button" class="tab @(isLink ? "" : "active")" @onclick="() => SetLink(false)">Text</button>
+        <button type="button" class="tab @(isLink ? "active" : "")" @onclick="() => SetLink(true)">Link</button>
+    </div>
+
+    @if (isLink)
+    {
+        <div class="field">
+            <label for="url">URL</label>
+            <InputText id="url" @bind-Value="request.Url" placeholder="https://example.com" />
+            <ValidationMessage For="() => request.Url" />
+        </div>
+    }
+    else
+    {
+        <div class="field">
+            <label for="text">Text</label>
+            <InputTextArea id="text" rows="8" @bind-Value="request.Text" />
+            <ValidationMessage For="() => request.Text" />
+        </div>
+    }
+
+    @if (error is not null)
+    {
+        <p class="error">@error</p>
+    }
+
+    <button type="submit" class="btn btn-primary" disabled="@submitting">Create thread</button>
+</EditForm>
+
+@code {
+    private CreatePostRequest request = new();
+    private bool isLink;
+    private bool submitting;
+    private string? error;
+
+    // A thread has EITHER text OR a url, so switching tabs clears the other one.
+    private void SetLink(bool link)
+    {
+        isLink = link;
+        request.Text = null;
+        request.Url = null;
+    }
+
+    private async Task Submit()
+    {
+        submitting = true;
+        error = null;
+        try
+        {
+            var created = await Api.CreatePostAsync(request);
+            Navigation.NavigateTo($"thread/{created.Id}");
+        }
+        catch (HttpRequestException)
+        {
+            error = "Could not create the thread. Please try again.";
+            submitting = false;
+        }
+    }
+}

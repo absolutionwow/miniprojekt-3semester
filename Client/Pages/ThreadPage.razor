@@ -1,0 +1,171 @@
+@page "/thread/{Id:int}"
+@inject ApiClient Api
+
+<PageTitle>@(post?.Title ?? "Thread")</PageTitle>
+
+@if (notFound)
+{
+    <h1>Thread not found</h1>
+    <p><a href="">Back to the front page</a></p>
+}
+else if (post is null && error is not null)
+{
+    <p class="error">@error</p>
+    <p><a href="">Back to the front page</a></p>
+}
+else if (post is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <p><a href="">← Back to the front page</a></p>
+
+    @if (error is not null)
+    {
+        <p class="error">@error</p>
+    }
+
+    <article class="thread-detail">
+        <VoteButtons Votes="post.Votes"
+                     OnUpvote="@(() => VotePost(true))"
+                     OnDownvote="@(() => VotePost(false))" />
+        <div class="thread-body">
+            <h1>@post.Title</h1>
+            <div class="meta">by @post.AuthorName · @post.CreatedAt.ToLocalTime().ToString("g")</div>
+
+            @if (post.Url is not null)
+            {
+                <p><a href="@post.Url" target="_blank" rel="noopener noreferrer">@post.Url</a></p>
+            }
+            else
+            {
+                <p class="thread-text">@post.Text</p>
+            }
+        </div>
+    </article>
+
+    <h2>Comments (@comments.Count)</h2>
+
+    @if (comments.Count == 0)
+    {
+        <p class="meta">No comments yet.</p>
+    }
+
+    @foreach (var c in comments)
+    {
+        <div class="comment">
+            <VoteButtons Votes="c.Votes"
+                         OnUpvote="@(() => VoteComment(c.Id, true))"
+                         OnDownvote="@(() => VoteComment(c.Id, false))" />
+            <div class="comment-body">
+                <div class="meta"><strong>@c.AuthorName</strong> · @c.CreatedAt.ToLocalTime().ToString("g")</div>
+                <p class="thread-text">@c.Text</p>
+            </div>
+        </div>
+    }
+
+    <h2>Add a comment</h2>
+    <EditForm Model="newComment" OnValidSubmit="SubmitComment" class="form">
+        <DataAnnotationsValidator />
+
+        <div class="field">
+            <label for="author">Your name</label>
+            <InputText id="author" @bind-Value="newComment.AuthorName" />
+            <ValidationMessage For="() => newComment.AuthorName" />
+        </div>
+
+        <div class="field">
+            <label for="text">Comment</label>
+            <InputTextArea id="text" rows="4" @bind-Value="newComment.Text" />
+            <ValidationMessage For="() => newComment.Text" />
+        </div>
+
+        <button type="submit" class="btn btn-primary" disabled="@submitting">Post comment</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private PostDetailDto? post;
+    private List<CommentDto> comments = new();
+    private CreateCommentRequest newComment = new();
+    private bool notFound;
+    private bool submitting;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        post = null;
+        notFound = false;
+        error = null;
+
+        try
+        {
+            var result = await Api.GetPostAsync(Id);
+            if (result is null)
+            {
+                notFound = true;
+            }
+            else
+            {
+                post = result;
+                comments = result.Comments;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            error = "Could not load the thread. Is the server running?";
+        }
+    }
+
+    private async Task VotePost(bool up)
+    {
+        try
+        {
+            var votes = await Api.VotePostAsync(Id, up);
+            post = post! with { Votes = votes };
+        }
+        catch (HttpRequestException)
+        {
+            error = "Could not register your vote.";
+        }
+    }
+
+    private async Task VoteComment(int commentId, bool up)
+    {
+        try
+        {
+            var votes = await Api.VoteCommentAsync(commentId, up);
+            var index = comments.FindIndex(c => c.Id == commentId);
+            if (index >= 0) comments[index] = comments[index] with { Votes = votes };
+        }
+        catch (HttpRequestException)
+        {
+            error = "Could not register your vote.";
+        }
+    }
+
+    private async Task SubmitComment()
+    {
+        submitting = true;
+        try
+        {
+            var created = await Api.AddCommentAsync(Id, newComment);
+            comments.Add(created);
+
+            // Keep the author name (people comment repeatedly), clear the text.
+            newComment = new CreateCommentRequest { AuthorName = newComment.AuthorName };
+            error = null;
+        }
+        catch (HttpRequestException)
+        {
+            error = "Could not post your comment.";
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+}
